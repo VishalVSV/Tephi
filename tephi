@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# TODO:
+# 1. Add an install command.
+# 2. Find a way to fuzzy search for packages.
+# 3. Find a way to select a package in case of conflict.
+# 4. Add a way to search installed packages.
+# 5. List recently installed packages.
+
+# Shouldn't need to ask for confirmation since dnf does that shit anyways
+
+# dnf search \"tikz-feynman\" -C -y -q --nogpgcheck --color=never | grep \"^texlive-\" | sed 's/texlive-//g' | sed 's/\.noarch : .*//g'
+# dnf -C -y --nogpgcheck -q repoquery --queryformat '%{name}' "texlive-*feynman*"
+# rpm --query "*feynman*" --all --queryformat "%{name}\n"
+tephi_version="v0.1.8"
+
+TEMP=$(getopt -o h,v --long help,version \
+-n 'tephi' -- "$@")
+
+eval set -- "$TEMP"
+
+function cli_help() {
+    echo "A helper for dnf based LaTeX package managing."
+    echo
+    echo "Usage:"
+    echo "    tephi -h"
+    echo "    tephi search <package_name>"
+    echo "    tephi install <package_name>   [Requires sudo password]"
+    echo "    tephi list"
+    echo
+    echo "Options:"
+    echo "h             Print this Help."
+    echo "v|version     Print software version and exit."
+    echo
+}
+
+
+# Reset
+Color_Off='\033[0m'       # Text Reset
+
+# Regular Colors
+Black='\033[0;30m'        # Black
+Red='\033[0;31m'          # Red
+Green='\033[0;32m'        # Green
+Yellow='\033[0;33m'       # Yellow
+Blue='\033[0;34m'         # Blue
+Purple='\033[0;35m'       # Purple
+Cyan='\033[0;36m'         # Cyan
+White='\033[0;37m'        # White
+
+# Bold
+BBlack='\033[1;30m'       # Black
+BRed='\033[1;31m'         # Red
+BGreen='\033[1;32m'       # Green
+BYellow='\033[1;33m'      # Yellow
+BBlue='\033[1;34m'        # Blue
+BPurple='\033[1;35m'      # Purple
+BCyan='\033[1;36m'        # Cyan
+BWhite='\033[1;37m'       # White
+
+# Underline
+UBlack='\033[4;30m'       # Black
+URed='\033[4;31m'         # Red
+UGreen='\033[4;32m'       # Green
+UYellow='\033[4;33m'      # Yellow
+UBlue='\033[4;34m'        # Blue
+UPurple='\033[4;35m'      # Purple
+UCyan='\033[4;36m'        # Cyan
+UWhite='\033[4;37m'       # White
+
+# Background
+On_Black='\033[40m'       # Black
+On_Red='\033[41m'         # Red
+On_Green='\033[42m'       # Green
+On_Yellow='\033[43m'      # Yellow
+On_Blue='\033[44m'        # Blue
+On_Purple='\033[45m'      # Purple
+On_Cyan='\033[46m'        # Cyan
+On_White='\033[47m'       # White
+
+# High Intensity
+IBlack='\033[0;90m'       # Black
+IRed='\033[0;91m'         # Red
+IGreen='\033[0;92m'       # Green
+IYellow='\033[0;93m'      # Yellow
+IBlue='\033[0;94m'        # Blue
+IPurple='\033[0;95m'      # Purple
+ICyan='\033[0;96m'        # Cyan
+IWhite='\033[0;97m'       # White
+
+# Bold High Intensity
+BIBlack='\033[1;90m'      # Black
+BIRed='\033[1;91m'        # Red
+BIGreen='\033[1;92m'      # Green
+BIYellow='\033[1;93m'     # Yellow
+BIBlue='\033[1;94m'       # Blue
+BIPurple='\033[1;95m'     # Purple
+BICyan='\033[1;96m'       # Cyan
+BIWhite='\033[1;97m'      # White
+
+# High Intensity backgrounds
+On_IBlack='\033[0;100m'   # Black
+On_IRed='\033[0;101m'     # Red
+On_IGreen='\033[0;102m'   # Green
+On_IYellow='\033[0;103m'  # Yellow
+On_IBlue='\033[0;104m'    # Blue
+On_IPurple='\033[0;105m'  # Purple
+On_ICyan='\033[0;106m'    # Cyan
+On_IWhite='\033[0;107m'   # White
+
+if [ "$#" -eq 1 ]
+then
+    cli_help
+    exit 1
+fi
+
+# Taken from https://unix.stackexchange.com/a/684668
+# Multi line banners are generated like `banner ${COLOR} ${OPTIONAL_SECONDCOLOR} "first line" "second line" "third line"`
+function banner() {
+    local s=("${@:3}") b w
+    local second_color=$2
+    if [[ ! "$second_color" =~ "\e[".* ]]; then #If the second color isn't declared, then make the function use only the first color declared
+        local s=("${@:2}") b w
+        local second_color=$1
+    fi
+
+    for l in "${s[@]}"; do
+        ((w<${#l})) && { b="         $l         "; w="${#l}"; }
+    done
+    echo -ne $1
+    echo "-${b//?/-}-"
+    for l in "${s[@]}"; do
+        printf '         %s%*s%s         \n' "$(echo -ne $second_color)" "-$w" "$l" "$(echo -ne $1)"
+    done
+    echo -e "-${b//?/-}-${NC}"
+}
+
+while true; do
+    case $1 in
+        -h | --help | help | h) # display Help
+            cli_help
+        shift;;
+        search ) # search for package
+            echo -e "$Blue Searching DNF: $Color_Off"
+            (dnf -C -y --nogpgcheck -q --color=never repoquery --queryformat '%{name}' "texlive-*$2*" | sed -n 's/^/    /p')
+        shift 2;;
+        install ) # Install a tex package
+            install_name=$(dnf -C -y --nogpgcheck -q --color=never repoquery --queryformat '%{name}' "texlive-*$2*" | grep -m 1 $2 | grep -v doc)
+            sudo dnf install $install_name
+        shift 2;;
+        list ) # list installed latex pkgs
+            echo -e "$Blue Listing Installed Packages:$Color_Off"
+            (rpm --query "texlive-*" --all --queryformat "%{name}\n" | sed -n 's/texlive-//g;s/^/    /p')
+        shift;;
+        -v | --version)
+            # Make this fancy in the future.
+            banner "" "Tephi Version: $tephi_version" "Written by Vishal Sai Vetrivel"
+        shift;;
+        \?)
+            cli_help
+        break;;
+        -- )
+        shift;;
+        * )
+        break;;
+    esac
+done

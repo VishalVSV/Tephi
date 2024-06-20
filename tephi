@@ -19,21 +19,6 @@ TEMP=$(getopt -o h,v --long help,version \
 
 eval set -- "$TEMP"
 
-function cli_help() {
-    echo "A helper for dnf based LaTeX package managing."
-    echo
-    echo "Usage:"
-    echo "    tephi -h"
-    echo "    tephi search <package_name>"
-    echo "    tephi install <package_name>   [Requires sudo password]"
-    echo "    tephi list"
-    echo
-    echo "Options:"
-    echo "h             Print this Help."
-    echo "v|version     Print software version and exit."
-    echo
-}
-
 
 # Reset
 Color_Off='\033[0m'       # Text Reset
@@ -107,6 +92,78 @@ On_IBlue='\033[0;104m'    # Blue
 On_IPurple='\033[0;105m'  # Purple
 On_ICyan='\033[0;106m'    # Cyan
 On_IWhite='\033[0;107m'   # White
+
+
+
+function cli_help() {
+    echo "A helper for dnf based LaTeX package managing."
+    echo
+    echo "Usage:"
+    echo "    tephi -h"
+    echo "    tephi search <package_name>"
+    echo "    tephi install <package_name>   [Requires sudo password]"
+    echo "    tephi list"
+    echo
+    echo "Options:"
+    echo "h             Print this Help."
+    echo "v|version     Print software version and exit."
+    echo
+}
+
+# Super sus self update protocol
+function check_update() {
+    tempfile=$(mktemp "$BASH_SOURCE".XXXXXX)
+    if curl -s https://raw.githubusercontent.com/VishalVSV/Tephi/main/tephi >"$tempfile"; then
+
+        if cmp -s "$tempfile" "$BASH_SOURCE"; then
+            echo $Green Tephi is up to date! $Color_Off
+        else 
+            echo -e ${Green}An update has been found for tephi.$Color_Off
+            echo -n Do you wish to update? \(y/n\)?
+            read answer
+
+            if [ "$answer" != "${answer#[Yy]}" ] ;then 
+                chown --reference="$BASH_SOURCE" -- "$tempfile"
+                chmod --reference="$BASH_SOURCE" -- "$tempfile"
+                sync # force your filesystem to fully flush file contents to disk
+                mv -- "$tempfile" "$BASH_SOURCE"
+                echo Tephi has been updated!
+                rm -f -- "$tempfile"
+
+                exit 0
+            else
+                echo 
+            fi
+        fi
+
+        rm -f -- "$tempfile"
+    else
+        rm -f -- "$tempfile"
+        exit 1
+    fi
+}
+
+
+
+state_file=${XDG_STATE_HOME:-${HOME}/.local/state}/tephi_state
+
+last_update_check=0
+
+if [ -e "$state_file" ] ; then
+    last_update_check=$(cat "$state_file")
+else 
+    last_update_check="$(date +%s)"
+    echo $last_update_check > "$state_file"
+fi
+
+current_time=$(date +%s)
+
+# Only check for updates every day
+if ((current_time - last_update_check > 86400)); then 
+    last_update_check="$(date +%s)"
+    echo $last_update_check > "$state_file"
+    check_update
+fi
 
 if [ "$#" -eq 1 ]
 then

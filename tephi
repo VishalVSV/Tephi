@@ -116,7 +116,7 @@ function check_update() {
     if curl -s https://raw.githubusercontent.com/VishalVSV/Tephi/main/tephi >"$tempfile"; then
 
         if cmp -s "$tempfile" "$BASH_SOURCE"; then
-            echo $Green Tephi is up to date! $Color_Off
+            :
         else 
             echo -e ${Green}An update has been found for tephi.$Color_Off
             echo -n Do you wish to update? \(y/n\)?
